@@ -1,7 +1,9 @@
+#![doc = include_str!("../README.md")]
+
 use std::{
     any::Any,
     collections::HashMap,
-    sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc},
+    sync::{atomic::{AtomicBool, Ordering}, Arc},
     thread::{self, JoinHandle}
 };
 
@@ -12,25 +14,12 @@ use curry::CallOnce;
 use queue::{when_ci_comed, C1map};
 pub use queue::{spawn_thread, Queue};
 use task::Task;
+use task::TaskBuild;
 pub use task::TaskCurrier;
-pub use task::Which;
+pub use task::Anchor;
 pub use task::Kind;
-
-pub(crate) static TASK_ID:TaskIdGen = TaskIdGen::new();
-
-struct TaskIdGen {
-    nexter: AtomicUsize
-}
-impl TaskIdGen {
-    const fn new()->Self {
-        Self {
-            nexter: AtomicUsize::new(0)
-        }
-    }
-    fn next(&self)->usize {
-        self.nexter.fetch_add(1, Ordering::Relaxed)
-    } 
-}
+pub use curry::Currier;
+pub use task::IntoTaskBuild;
 
 
 /// a handle to a thread spawned for queue
@@ -79,7 +68,7 @@ impl Pool {
     }
 
     /// Enqueues a new task for future scheduling
-    pub fn add<C>(&self,task:TaskCurrier<C>)->usize
+    pub fn add<C>(&self,TaskBuild(task,taskid):TaskBuild<C>)->usize
         where
         TaskCurrier<C>: Task,
         C: CallOnce + Send + 'static,
@@ -88,12 +77,12 @@ impl Pool {
         let c1map = self.c1map.clone();
         let c1queue = self.queues.values().next().unwrap().clone();
         let postdo = move |r: Box<dyn Any>| {
-            let Ok(r) = r.downcast::<C::R>() else {
+            let (Some(to),Ok(r)) = (task.to,r.downcast::<C::R>()) else {
                 assert!(false,"failed to conver to R type");
                 return;
             };
             let r: C::R = *r;
-            when_ci_comed(&task.to, r, c1map.clone(), c1queue);
+            when_ci_comed(&to, r, c1map.clone(), c1queue);
         };
         let postdo = Box::new(postdo);
 
@@ -103,7 +92,7 @@ impl Pool {
             normal.add_boxtask(task,postdo);
             usize::MAX
         } else {
-            let id = self.c1map.insert(task, postdo).unwrap();
+            let id = self.c1map.insert(task, postdo,taskid).unwrap();
             id
         }
     }

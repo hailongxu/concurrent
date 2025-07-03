@@ -49,6 +49,41 @@ fn test2() {
     println!("{:?}",c2.c);
 }
 
+#[test]
+fn test3<'a>() {
+    struct FtOnce;
+    // struct FtMut;
+    // struct FtImut;
+    trait Fmeta<T,R> {
+        // type Fy;
+        type Ftag;
+        type Params;
+        type R;
+        // fn me(self)->Self;
+    }
+    impl<T:FnOnce()->R,R> Fmeta<(),R> for T {
+        // type Fy = &(dyn FnOnce() + 'static);
+        type Ftag = FtOnce;
+        type Params = ();
+        type R = R;
+    }
+    impl<T:FnOnce(P1)->R,P1,R> Fmeta<(P1,),R> for T {
+        // type Fy = T;
+        type Ftag = FtOnce;
+        type Params = (P1,);
+        type R = R;
+    }
+    fn ff<P,R>(f: impl Fmeta<P,R>)->impl Fmeta<P,R> {
+        f
+    }
+
+    let a = ff(||{});
+    ff(||{3});
+    ff(|a:i32|a);
+    ff(|a: &'a str| -> &'a str { a });
+    let _: &dyn Fn() = &||{};
+}
+
 
 pub(crate) trait CallOnce {
     type R;
@@ -369,7 +404,7 @@ where
 impl<F,P1:Clone+'static,R> CallParam for Currier<F,(Option<P1>,),R>
 {
     fn set(&mut self, i:usize, value: &dyn Any)->bool {
-        let Some(p1) = value.downcast_ref::<P1>() else {
+        let (Some(p1),true) = (value.downcast_ref::<P1>(), i==0) else {
             return false;
         };
         self.c.0 = Some(p1.clone());
@@ -393,6 +428,7 @@ mod test_1 {
         c.call_once();
 
         let mut c = Currier::from(|a:i32|a>3);
+        c.c.0 = Some(3);
         let c = &mut c;
         c.call();
         c.call_mut();
@@ -418,6 +454,7 @@ mod test_1 {
     #[should_panic]
     fn test_panic() {
         let mut c = Currier::from(|a:i32|a>3);
+        // c.as_param_mut().unwrap().set(0, &3); you must set the param first
         c.call();
         c.call_mut();
         c.call_once();

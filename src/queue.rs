@@ -5,7 +5,8 @@ use std::{
     Condvar, Mutex}, thread
 };
 
-use crate::{task::{Task, Kind, Which}, Jhandle};
+use crate::{task::{Task, Kind, Anchor}, Jhandle};
+use crate::task::taskid_next;
 
 
 type PostDo = dyn FnOnce(Box<dyn Any>) + Send;
@@ -96,10 +97,11 @@ impl C1map {
             Arc::new((Mutex::new(HashMap::new()),Condvar::new()))
         )
     }
-    pub(crate) fn insert<T>(&self,task: T,postdo:Box<PostDo>)->Option<usize>
+    pub(crate) fn insert<T>(&self,task: T,postdo:Box<PostDo>,taskid:Option<usize>)->Option<usize>
     where T: Task + Send + 'static
     {
-        let taskid = crate::TASK_ID.next();
+        let mut taskid = taskid;
+        let taskid = *taskid.get_or_insert_with(||taskid_next());
         let task: Box::<dyn Task + Send + 'static> = Box::new(task);
         let mut lock = self.0.0.lock().unwrap();
         lock.insert(taskid, (task,postdo));
@@ -110,29 +112,26 @@ impl C1map {
         lock.remove(&id)
     }
 
-    fn update_ci<T:'static>(&self,which:&Which,v:T)->Option<bool> {
+    fn update_ci<T:'static>(&self,which:&Anchor,v:T)->Option<bool> {
         let mut lock = self.0.0.lock().unwrap();
-        let Some((task,postdo)) = lock.get_mut(&which.id) else {
+        let Some((task,postdo)) = lock.get_mut(&which.id()) else {
             return None;
         };
         let Some(param) = task.as_param_mut() else {
             return None;
         };
-        if !param.set(which.i, &v) {
+        if !param.set(which.i(), &v) {
             return None;
         }
         Some(param.is_full())
     }
 }
 
-pub(crate) fn when_ci_comed<T:'static>(which:&Which, v:T, c1map: C1map, q:Queue)->bool {
-    if which.is_none() {
-        return false;
-    }
-    let Some(true) = c1map.update_ci(which, v) else {
+pub(crate) fn when_ci_comed<T:'static>(to:&Anchor, v:T, c1map:C1map, q:Queue)->bool {
+    let Some(true) = c1map.update_ci(to, v) else {
         return false;
     };
-    let Some((task,postdo)) = c1map.remove(which.id) else {
+    let Some((task,postdo)) = c1map.remove(to.id()) else {
         return  false;
     };
     q.add_boxtask(task,postdo);

@@ -7,5 +7,9 @@ license = "MIT or Apache-2.0"
 repository = "https://github.com/hailongxu/taskorch"
 keywords = ["concurrency","task","orchestration","scheduler"]
 category = ["concurrency"]
+readme = "README.md"
 
 [dependencies]
+
+[dev-dependencies]
+named_tuple = "0.1"
