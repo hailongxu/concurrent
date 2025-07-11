@@ -1,6 +1,6 @@
 [package]
 name = "taskorch"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 authors = ["xuhailong"]
 description = "Concurrent Pool for task processing"
@@ -11,3 +11,11 @@ category = ["concurrency"]
 readme = "README.md"
 
 [dependencies]
+
+[features]
+default=["release_max_level_warn"]
+release_max_level_error=[]
+release_max_level_warn=[]
+release_max_level_info=[]
+release_max_level_debug=[]
+release_max_level_trace=[]

@@ -3,9 +3,13 @@
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
+    fmt::Debug,
     sync::{atomic::{AtomicBool, Ordering}, Arc},
     thread::{self, JoinHandle}
 };
+
+#[macro_use]
+mod log;
 
 mod curry;
 mod queue;
@@ -118,8 +122,11 @@ impl Pool {
 
     /// block until all threads have exited
     pub fn join(self) {
-        for handle in self.jhands {
-            if let Err(err) = handle.1.0.join() {
+        let thcount = self.jhands.len();
+        let mut exit_log = String::with_capacity(thcount*"thread(123) ".len());
+        for (_innerid,handle) in self.jhands {
+            let thid = handle.0.thread().id();
+            if let Err(err) = handle.0.join() {
                 let err = if let Some(s) = err.downcast_ref::<&str>() {
                     format!(" thread panic: {}", s)
                 } else if let Some(s) = err.downcast_ref::<String>() {
@@ -127,9 +134,14 @@ impl Pool {
                 } else {
                     format!("thread panic (unknow)")
                 };
+                error!("{err}");
                 panic!("{}", err);
             }
+            let thidstr = format!("{:?} ",thid);
+            exit_log.push_str(&thidstr);
+            warn!("thread [{thid:?}] exits ok.");
         }
+        warn!("pool with {thcount} threads: [{exit_log}] exits ok.");
     }
 }
 
@@ -154,7 +166,7 @@ impl TaskSubmitter {
         where
         TaskCurrier<C>: Task,
         C: CallOnce + Send + 'static,
-        C::R: 'static,
+        C::R: 'static + Debug,
     {
         let c1map = self.c1map.clone();
         let c1queue = self.queue.clone();
@@ -166,7 +178,7 @@ impl TaskSubmitter {
             let Ok(r) = r.downcast::<C::R>() else {
                 let _expected_type = TypeId::of::<C::R>();
                 let expected_type_name = std::any::type_name::<C::R>();
-                eprintln!(
+                error!(
                     "to {to:?}.\ndowncast failed: expected {}, got {:?}",
                     expected_type_name, actual_type
                 );
@@ -181,9 +193,11 @@ impl TaskSubmitter {
         if 0 == task.currier.count() {
             let task = Box::new(task);
             self.queue.add_boxtask(task,postdo);
+            debug!("task #{} added", usize::MAX);
             usize::MAX
         } else {
             let id = self.c1map.insert(task, postdo,taskid).unwrap();
+            debug!("task with cond #{} added", id);
             id
         }
     }

@@ -107,7 +107,10 @@ pub trait TaskBuildNew<TC> {
     /// - An optional task ID (`usize`), if `None`, an ID auto-generated when needed
     fn into_task(self)->(TC,Option<usize>);
 
-    #[deprecated(note = "Use `into_task()` instead for clearer ownership semantic. `task()` will be removed in the next release.")]
+    #[deprecated(
+        since="0.2.0",
+        note = "Use `into_task()` instead for clearer ownership semantic. `task()` will be removed in the next release."
+    )]
     fn task(self)->(TC,Option<usize>) where Self:Sized {
         self.into_task()
     }
@@ -118,7 +121,10 @@ pub trait TaskBuildNew<TC> {
     /// after task completion.
     fn into_exit_task(self)->(TC,Option<usize>);
 
-    #[deprecated(note = "Use `into_exit_task()` instead for clearer ownership semantic. `exit_task()` will be removed in the next release.")]
+    #[deprecated(
+        since="0.2.0",
+        note = "Use `into_exit_task()` instead for clearer ownership semantic. `exit_task()` will be removed in the next release."
+    )]
     fn exit_task(self)->(TC,Option<usize>) where Self:Sized {
         self.into_exit_task()
     }

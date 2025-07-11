@@ -26,7 +26,7 @@ fn main() {
     submitter.submit(
         (||{
             const MSG: &'static str = "exit";
-            println!("task 'AA':  I pass [\"{MSG}\"] to exit-task to exit");
+            println!("task 'AA':  I pass ['{MSG}'] to exit-task to exit");
             MSG
         }).into_task().to(id_exit, 0)
     );
